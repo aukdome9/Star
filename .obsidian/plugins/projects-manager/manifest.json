@@ -1,0 +1,11 @@
+{
+  "id": "projects-manager",
+  "name": "Projects Planner",
+  "version": "1.0.3",
+  "minAppVersion": "1.4.0",
+  "description": "Manage projects in plain markdown: track status, milestones, tasks, and progress with a kanban-style sidebar view.",
+  "author": "wesswart77",
+  "authorUrl": "https://github.com/wesswart77",
+  "fundingUrl": "https://www.buymeacoffee.com/wesswart77",
+  "isDesktopOnly": false
+}

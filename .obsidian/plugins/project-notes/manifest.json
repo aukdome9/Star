@@ -1,0 +1,11 @@
+{
+	"id": "project-notes",
+	"name": "Project Notes",
+	"version": "1.0.10",
+	"minAppVersion": "1.10.0",
+	"description": "Tools for simple note-based project management.",
+	"author": "dartungar",
+	"authorUrl": "https://dartungar.com",
+	"fundingUrl": "https://www.paypal.com/paypalme/dartungar",	
+	"isDesktopOnly": false
+}

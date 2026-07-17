@@ -1,0 +1,24 @@
+# Obsidian local/cache
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+.obsidian/plugins/*/data.json.bak
+.trash/
+
+# Secrets & env
+.env
+.env.*
+**/*secret*
+**/*credentials*
+**/*.pem
+**/token.json
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Star local
+.star/session*
+*.pyc
+__pycache__/

@@ -1,0 +1,6 @@
+{
+  "folder": "Calendar/Daily",
+  "template": "Calendar/templates/daily-note",
+  "format": "YYYY-MM-DD",
+  "autorun": true
+}

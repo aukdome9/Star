@@ -1,0 +1,15 @@
+{
+  "merged_at": "2026-07-17T00:43:08",
+  "source": "C:\\Users\\aukdo\\Star system\\obsidian-infinite-brain-master",
+  "master": "C:\\Users\\aukdo\\Downloads\\master\\Master vault",
+  "second_brain": "C:\\Users\\aukdo\\Downloads\\master\\Master vault\\Second Brain",
+  "copy_stats": {
+    "copied": 42,
+    "skipped_existing": 0,
+    "dirs": 4
+  },
+  "star_config": {
+    "OBSIDIAN_VAULT_PATH": "C:\\Users\\aukdo\\Downloads\\master\\Master vault\\Second Brain",
+    "MASTER_VAULT_PATH": "C:\\Users\\aukdo\\Downloads\\master\\Master vault"
+  }
+}
