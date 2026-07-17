@@ -315,6 +315,9 @@
       const [agentJob, setAgentJob] = useState("");
       const [agentBusy, setAgentBusy] = useState(false);
       const [newNoteTitle, setNewNoteTitle] = useState("");
+      const [ghStatus, setGhStatus] = useState(null);
+      const [ghBusy, setGhBusy] = useState(false);
+      const [ghLog, setGhLog] = useState("");
 
       // chat
       const [input, setInput] = useState("");
@@ -353,6 +356,46 @@
           const m = await starFetch(`/memory/query?vault=${encodeURIComponent(vaultSrc)}&q=${encodeURIComponent(vaultQ)}&limit=40`);
           if (m.ok) setVaultHits(m.results || []);
         } catch (e) {}
+        try {
+          const g = await starFetch("/github/status", { timeout: 20000 });
+          setGhStatus(g);
+        } catch (e) {}
+      };
+
+      const pushToGitHub = async () => {
+        setGhBusy(true);
+        setGhLog("Pushing Master vault to GitHub…");
+        try {
+          const r = await starFetch("/github/push", {
+            method: "POST",
+            timeout: 300000,
+            body: JSON.stringify({ message: `Star dashboard sync ${new Date().toISOString().slice(0, 16)}` }),
+          });
+          if (r.ok) {
+            setGhLog(`Pushed · ${r.head || "ok"} → ${r.github_web || GITHUB_REPO}`);
+          } else {
+            setGhLog((r.detail || "Push failed") + (r.hint ? " · " + r.hint : ""));
+          }
+          try { setGhStatus(await starFetch("/github/status", { timeout: 20000 })); } catch (e) {}
+        } catch (e) {
+          setGhLog("Push failed — is Star online? Auth may need GitHub login / PAT.");
+        } finally {
+          setGhBusy(false);
+        }
+      };
+
+      const pullFromGitHub = async () => {
+        setGhBusy(true);
+        setGhLog("Pulling from GitHub…");
+        try {
+          const r = await starFetch("/github/pull", { method: "POST", timeout: 180000, body: "{}" });
+          setGhLog(r.ok ? "Pull complete." : (r.detail || "Pull failed"));
+          refresh();
+        } catch (e) {
+          setGhLog("Pull failed.");
+        } finally {
+          setGhBusy(false);
+        }
       };
 
       useEffect(() => {
@@ -645,11 +688,27 @@
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end">
                 {sessionId && <span className="text-[9px] font-mono text-zinc-500" title={sessionId}>session {String(sessionId).slice(0, 8)}…</span>}
+                {ghStatus && ghStatus.ok && (
+                  <span className={`text-[9px] font-mono px-2 py-0.5 rounded border ${ghStatus.dirty ? "text-amber border-amber/30" : "text-jade border-jade/30"}`}>
+                    {ghStatus.dirty ? `${ghStatus.changed_count} local change(s)` : "vault clean"}
+                    {ghStatus.ahead > 0 ? ` · ↑${ghStatus.ahead}` : ""}
+                    {ghStatus.behind > 0 ? ` · ↓${ghStatus.behind}` : ""}
+                  </span>
+                )}
+                <button type="button" className="glass-button active text-[10px]" disabled={ghBusy} onClick={pushToGitHub}>
+                  {ghBusy ? "Syncing…" : "Push to GitHub"}
+                </button>
                 <a href={GITHUB_REPO} target="_blank" rel="noreferrer" className="text-[10px] font-mono px-2 py-1 rounded border border-royal/30 text-royal hover:bg-royal/10">
-                  GitHub
+                  Open repo
                 </a>
               </div>
             </header>
+            {ghLog && (
+              <div className="mb-2 px-3 py-2 rounded-xl border border-royal/20 bg-black/40 text-[10px] font-mono text-zinc-400 flex justify-between gap-2">
+                <span>{ghLog}</span>
+                <button type="button" className="text-zinc-600" onClick={() => setGhLog("")}>×</button>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto min-h-0 space-y-3">
               {/* DASHBOARD */}
@@ -730,7 +789,7 @@
                     <p className="text-xs text-zinc-400 leading-relaxed max-w-3xl">
                       Continuous Grok archives and organizes your <strong className="text-zinc-200">Master Obsidian vault</strong>.
                       Edit in Obsidian, this dashboard, or chat. Second Brain + agents live inside Master.
-                      Mirror: <a className="text-royal underline" href={GITHUB_REPO} target="_blank" rel="noreferrer">{GITHUB_REPO}</a>
+                      Push publishes the live vault to GitHub for phone access.
                     </p>
                     <div className="flex flex-wrap gap-2 text-[10px] font-mono pt-1">
                       <span className="px-2 py-1 rounded border border-white/10 text-zinc-400">Dashboard.md</span>
@@ -738,6 +797,33 @@
                       <span className="px-2 py-1 rounded border border-white/10 text-zinc-400">Second Brain</span>
                       <span className="px-2 py-1 rounded border border-white/10 text-zinc-400">STAR OPERATOR.md</span>
                     </div>
+                  </div>
+
+                  <div className="glass-panel p-4 space-y-3 border-l-4 border-royal">
+                    <div className="flex flex-wrap justify-between gap-2 items-start">
+                      <div>
+                        <h4 className="text-xs font-display text-royal uppercase tracking-wider">GitHub sync</h4>
+                        <p className="text-[11px] text-zinc-500 font-mono mt-1">
+                          {ghStatus?.remote || "https://github.com/aukdome9/Star.git"} · {ghStatus?.branch || "main"}
+                        </p>
+                        {ghStatus?.head && <p className="text-[10px] text-zinc-600 font-mono mt-0.5">HEAD {ghStatus.head}</p>}
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" className="glass-button text-[10px]" disabled={ghBusy} onClick={pullFromGitHub}>Pull</button>
+                        <button type="button" className="glass-button active text-[10px]" disabled={ghBusy} onClick={pushToGitHub}>
+                          {ghBusy ? "Working…" : "Push vault to GitHub"}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      This commits every change on this computer's Master vault (notes, tasks, Second Brain, dashboard HTML)
+                      and pushes to the repo you open on your phone. Use after agent edits or manual Save.
+                    </p>
+                    {ghStatus?.dirty && (
+                      <div className="text-[10px] font-mono text-amber max-h-24 overflow-y-auto">
+                        Pending: {(ghStatus.changed_files || []).slice(0, 12).join(" · ") || `${ghStatus.changed_count} files`}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -898,17 +984,31 @@
                       <span className="text-zinc-500">Unified knowledge</span>
                       <span className="font-mono text-jade">{String(health?.knowledge?.unified ?? "—")}</span>
                     </div>
+                    <div className="flex justify-between border-b border-white/5 py-2">
+                      <span className="text-zinc-500">GitHub remote</span>
+                      <span className="font-mono text-zinc-400 text-right max-w-[60%] truncate">{ghStatus?.remote || "—"}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 py-2">
+                      <span className="text-zinc-500">Local changes</span>
+                      <span className="font-mono text-zinc-300">{ghStatus?.dirty ? ghStatus.changed_count : 0}</span>
+                    </div>
                   </div>
                   <p className="text-[11px] text-zinc-500 leading-relaxed">
-                    Core loop: dashboard edits write to Master vault on disk · continuous Grok (cwd = Master) uses tools to reorganize the same network · Obsidian reflects changes live.
+                    Core loop: dashboard / agent edit Master on disk → <strong className="text-zinc-300">Push to GitHub</strong> publishes for phone → Pull brings remote edits back.
                     Launch with <span className="font-mono text-royal">start star</span>.
                   </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" className="glass-button active" onClick={pushToGitHub} disabled={ghBusy}>Push to GitHub</button>
+                    <button type="button" className="glass-button" onClick={pullFromGitHub} disabled={ghBusy}>Pull</button>
+                    <button type="button" className="glass-button" onClick={refresh}>Refresh status</button>
+                  </div>
+                  {ghLog && <p className="text-[10px] font-mono text-gold">{ghLog}</p>}
                   <div className="text-[10px] font-mono text-zinc-500 space-y-1">
+                    <div>POST /github/push — commit + push vault</div>
+                    <div>POST /github/pull — pull remote</div>
                     <div>PUT /memory/note — direct save</div>
                     <div>POST /agent/vault-task — activate agent on vault</div>
-                    <div>POST /chat/stream — talk + tools</div>
                   </div>
-                  <button type="button" className="glass-button active" onClick={refresh}>Refresh status</button>
                 </div>
               )}
             </div>

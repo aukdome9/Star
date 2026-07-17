@@ -36,6 +36,8 @@ Not yet built out for this topic — the content pipeline gets built once the fi
 
 **The Eight Remembrances** — filed 2026-07-17 — draft curriculum tracker for the eight one-hour video sessions. Titles are proposed, not locked.
 
+**The Advancing Thought** — filed 2026-07-17 — Session One in full: forgotten divinity, the Advancing Thought, Earth-abundance math, multidimensional capacity, the oversoul, gratitude, and desire as proof of capacity, each with a checkable reference. The first of the Eight Remembrances to move from proposed to drafted.
+
 **The Invisible Forge** — filed 2026-07-17 — the paid community and newsletter doctrine, including the closing Founders Deal.
 
 ---
