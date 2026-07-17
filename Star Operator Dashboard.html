@@ -170,6 +170,24 @@
 
     const GITHUB_REPO = "https://github.com/aukdome9/Star";
 
+    // Access gate — only a hash is stored (not the password). Session lasts for this browser tab.
+    // NOTE: Client-side gates are NOT real security on a public repo. Prefer a PRIVATE GitHub repo.
+    const AUTH_HASH = "0bca80082275884bfcebc0716a67eef6776bfd86c9652e34d55875d3010d7348";
+    const AUTH_SESSION_KEY = "star_operator_auth_v1";
+
+    async function sha256Hex(text) {
+      const data = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest("SHA-256", data);
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+
+    async function verifyCredentials(username, password) {
+      const u = (username || "").trim().toLowerCase();
+      const p = (password || "").trim().toLowerCase();
+      const digest = await sha256Hex(u + ":" + p);
+      return digest === AUTH_HASH;
+    }
+
     async function starFetch(path, opts = {}) {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), opts.timeout || 8000);
@@ -201,7 +219,78 @@
       return <svg {...common}><circle cx="12" cy="12" r="9"/></svg>;
     }
 
+    function LoginGate({ onUnlock }) {
+      const [user, setUser] = useState("");
+      const [pass, setPass] = useState("");
+      const [err, setErr] = useState("");
+      const [busy, setBusy] = useState(false);
+
+      const submit = async (e) => {
+        if (e) e.preventDefault();
+        setBusy(true);
+        setErr("");
+        try {
+          const ok = await verifyCredentials(user, pass);
+          if (!ok) {
+            setErr("Invalid username or password.");
+            setBusy(false);
+            return;
+          }
+          try { sessionStorage.setItem(AUTH_SESSION_KEY, "1"); } catch (x) {}
+          onUnlock();
+        } catch (ex) {
+          setErr("Could not verify credentials in this browser.");
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      return (
+        <div className="flex h-screen w-screen items-center justify-center p-4 relative z-10">
+          <form onSubmit={submit} className="glass-panel p-6 md:p-8 w-full max-w-md space-y-4">
+            <div className="text-center space-y-1">
+              <div className="text-2xl text-gold font-display">★</div>
+              <h1 className="text-lg font-display tracking-widest uppercase">Star Operator</h1>
+              <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Access required</p>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-500 uppercase">Username</label>
+              <input
+                className="glass-input"
+                autoComplete="username"
+                autoFocus
+                value={user}
+                onChange={e => setUser(e.target.value)}
+                placeholder="username"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-mono text-zinc-500 uppercase">Password</label>
+              <input
+                className="glass-input"
+                type="password"
+                autoComplete="current-password"
+                value={pass}
+                onChange={e => setPass(e.target.value)}
+                placeholder="password"
+              />
+            </div>
+            {err && <p className="text-[11px] font-mono text-rose">{err}</p>}
+            <button type="submit" className="glass-button active w-full justify-center" disabled={busy}>
+              {busy ? "Checking…" : "Enter"}
+            </button>
+            <p className="text-[9px] font-mono text-zinc-600 text-center leading-relaxed">
+              Protected entry for the Star archive. Session lasts while this tab is open.
+            </p>
+          </form>
+        </div>
+      );
+    }
+
     function App() {
+      const [authed, setAuthed] = useState(() => {
+        try { return sessionStorage.getItem(AUTH_SESSION_KEY) === "1"; } catch (e) { return false; }
+      });
       const [tab, setTab] = useState(() => {
         try {
           const t = new URLSearchParams(window.location.search).get("tab");
@@ -404,6 +493,15 @@
 
       const label = (NAV.find(n => n.id === tab) || {}).label || tab;
 
+      const logout = () => {
+        try { sessionStorage.removeItem(AUTH_SESSION_KEY); } catch (e) {}
+        setAuthed(false);
+      };
+
+      if (!authed) {
+        return <LoginGate onUnlock={() => setAuthed(true)} />;
+      }
+
       return (
         <div className="flex h-screen w-screen overflow-hidden relative z-10 p-2 md:p-3 gap-2 md:gap-3">
           {/* Sidebar */}
@@ -440,6 +538,11 @@
               <button type="button" className="glass-button w-full justify-center text-[10px]" onClick={() => setCollapsed(c => !c)}>
                 {collapsed ? "»" : "Collapse"}
               </button>
+              {!collapsed && (
+                <button type="button" className="glass-button w-full justify-center text-[10px] text-zinc-500" onClick={logout}>
+                  Lock
+                </button>
+              )}
             </div>
           </aside>
 
