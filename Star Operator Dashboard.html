@@ -310,6 +310,11 @@
       const [vaultQ, setVaultQ] = useState("");
       const [vaultSrc, setVaultSrc] = useState("all");
       const [noteBody, setNoteBody] = useState(null);
+      const [editContent, setEditContent] = useState("");
+      const [saveStatus, setSaveStatus] = useState("");
+      const [agentJob, setAgentJob] = useState("");
+      const [agentBusy, setAgentBusy] = useState(false);
+      const [newNoteTitle, setNewNoteTitle] = useState("");
 
       // chat
       const [input, setInput] = useState("");
@@ -317,7 +322,7 @@
       const [toolHint, setToolHint] = useState("");
       const [msgs, setMsgs] = useState([{
         id: 1, sender: "Grok", type: "status",
-        text: "Star Operator online. Master vault is the archive — create, edit, organize, and schedule work here. Ask me anything about your notes, tasks, or Second Brain.",
+        text: "Star Operator online. I run on this PC with full tools inside your Master vault — the same files Obsidian uses. Ask me to create, edit, reorganize, or schedule notes and I will write them to disk.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
       }]);
       const idRef = useRef(1);
@@ -486,8 +491,93 @@
         try {
           const n = await starFetch(`/memory/note?vault=master&path=${encodeURIComponent(path)}`);
           setNoteBody(n);
+          setEditContent(n.content || "");
+          setSaveStatus("");
+          setAgentJob("");
         } catch (e) {
-          setNoteBody({ title: path, content: "Could not load note.", rel_path: path });
+          setNoteBody({ title: path, content: "Could not load note.", rel_path: path, path });
+          setEditContent("");
+        }
+      };
+
+      const saveNoteToDisk = async () => {
+        if (!noteBody || !noteBody.path) return;
+        setSaveStatus("Saving…");
+        try {
+          const r = await starFetch("/memory/note", {
+            method: "PUT",
+            timeout: 15000,
+            body: JSON.stringify({ path: noteBody.path, content: editContent }),
+          });
+          setSaveStatus(r.message || `Saved · ${r.rel_path}`);
+          setNoteBody(prev => prev ? { ...prev, content: editContent, title: r.title || prev.title, rel_path: r.rel_path || prev.rel_path } : prev);
+          refresh();
+        } catch (e) {
+          setSaveStatus("Save failed — is Star online?");
+        }
+      };
+
+      const createNoteOnDisk = async () => {
+        const title = newNoteTitle.trim();
+        if (!title) return;
+        setSaveStatus("Creating…");
+        try {
+          const r = await starFetch("/memory/note", {
+            method: "POST",
+            timeout: 15000,
+            body: JSON.stringify({ title, body: `Created from Star dashboard.\n`, folder: "notes" }),
+          });
+          setNewNoteTitle("");
+          setSaveStatus(`Created · ${r.rel_path}`);
+          await openNote(r.path);
+          refresh();
+        } catch (e) {
+          setSaveStatus("Create failed — is Star online?");
+        }
+      };
+
+      const runVaultAgent = async (instructionOverride) => {
+        const instruction = (instructionOverride || agentJob || "").trim();
+        if (!instruction) return;
+        setAgentBusy(true);
+        setSaveStatus("Agent executing on vault…");
+        try {
+          const payload = {
+            instruction,
+            path: noteBody?.path || null,
+            content: editContent || noteBody?.content || null,
+          };
+          const r = await starFetch("/agent/vault-task", {
+            method: "POST",
+            timeout: 300000,
+            body: JSON.stringify(payload),
+          });
+          if (r.ok && r.reply) {
+            if (r.backend) setBackend(r.backend);
+            if (r.session_id) setSessionId(r.session_id);
+            idRef.current += 1;
+            setMsgs(prev => [...prev, {
+              id: idRef.current, sender: "Operator", type: "user", text: `[Vault job] ${instruction}`,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
+            }]);
+            idRef.current += 1;
+            setMsgs(prev => [...prev, {
+              id: idRef.current, sender: "Grok", type: "response", text: r.reply,
+              timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
+            }]);
+            setSaveStatus("Agent finished — reloading note from disk");
+            if (noteBody?.path) {
+              try { await openNote(noteBody.path); } catch (e) {}
+            }
+            refresh();
+            setTab("chat");
+          } else {
+            setSaveStatus(r.detail || "Agent job failed");
+          }
+        } catch (e) {
+          setSaveStatus("Agent unreachable — run start star");
+        } finally {
+          setAgentBusy(false);
         }
       };
 
@@ -669,7 +759,7 @@
                     </div>
                   </div>
                   <div className="p-3 border-b border-royal/10 bg-black/40 flex gap-2">
-                    <input className="glass-input flex-1" placeholder="Instruct the operator — /mem query · edit notes · plan the day…"
+                    <input className="glass-input flex-1" placeholder="Tell Grok what to do in the vault — create notes, reorganize, schedule tasks (writes to disk)…"
                       value={input} onChange={e => setInput(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && !e.shiftKey && send()} disabled={typing} autoFocus />
                     <button type="button" className="glass-button active" onClick={send} disabled={typing}>{typing ? "…" : "Send"}</button>
@@ -699,25 +789,33 @@
                 </div>
               )}
 
-              {/* MEMORY */}
+              {/* MEMORY — live Obsidian network editor + agent execution */}
               {tab === "memory" && (
                 <div className="view-enter grid grid-cols-1 lg:grid-cols-2 gap-3 h-[calc(100vh-120px)] min-h-[420px]">
                   <div className="glass-panel p-4 flex flex-col min-h-0">
                     <div className="flex justify-between items-center mb-3 border-b border-royal/15 pb-2">
-                      <h4 className="text-xs font-display text-royal uppercase tracking-wider">Master · Unified Network</h4>
+                      <h4 className="text-xs font-display text-royal uppercase tracking-wider">Master · Live network</h4>
                       <span className="text-[9px] font-mono text-zinc-500">{vaultHits.length} hits</span>
                     </div>
+                    <p className="text-[10px] text-zinc-500 font-mono mb-2">
+                      Same files as Obsidian on disk. Save writes immediately · Agent runs Grok tools on this PC.
+                    </p>
                     <div className="flex gap-1 mb-2">
                       {[{k:"all",l:"All"},{k:"master",l:"Master"},{k:"brain",l:"Second Brain"}].map(v => (
                         <button key={v.k} type="button" onClick={() => setVaultSrc(v.k)}
                           className={`text-[9px] font-mono px-2 py-0.5 rounded border ${vaultSrc===v.k ? "bg-royal/20 border-royal text-royal" : "border-white/10 text-zinc-500"}`}>{v.l}</button>
                       ))}
                     </div>
-                    <input className="glass-input mb-3" placeholder="Search vault…" value={vaultQ} onChange={e => setVaultQ(e.target.value)} />
+                    <input className="glass-input mb-2" placeholder="Search vault…" value={vaultQ} onChange={e => setVaultQ(e.target.value)} />
+                    <div className="flex gap-2 mb-3">
+                      <input className="glass-input flex-1" placeholder="New note title…" value={newNoteTitle}
+                        onChange={e => setNewNoteTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && createNoteOnDisk()} />
+                      <button type="button" className="glass-button active text-[10px]" onClick={createNoteOnDisk}>Create</button>
+                    </div>
                     <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
                       {vaultHits.map(n => (
                         <button key={n.id || n.path} type="button" onClick={() => openNote(n.path)}
-                          className="w-full text-left p-2.5 rounded-xl border border-white/5 bg-black/40 hover:border-royal/30">
+                          className={`w-full text-left p-2.5 rounded-xl border ${noteBody && noteBody.path === n.path ? "border-royal/50 bg-royal/10" : "border-white/5 bg-black/40 hover:border-royal/30"}`}>
                           <div className="text-[10px] font-mono text-royal">{n.namespace || "note"} · {n.type}</div>
                           <div className="text-xs text-zinc-200 truncate">{n.title}</div>
                           <div className="text-[10px] text-zinc-500 truncate">{n.summary}</div>
@@ -727,13 +825,44 @@
                     </div>
                   </div>
                   <div className="glass-panel p-4 flex flex-col min-h-0">
-                    <h4 className="text-xs font-display text-royal uppercase tracking-wider mb-3 border-b border-royal/15 pb-2">Note preview</h4>
-                    {!noteBody && <p className="text-xs text-zinc-500 font-mono">Select a hit to preview. Full edit in Obsidian or via Grok chat.</p>}
+                    <div className="flex justify-between items-center mb-2 border-b border-royal/15 pb-2 gap-2">
+                      <h4 className="text-xs font-display text-royal uppercase tracking-wider">Editor · on disk</h4>
+                      <div className="flex gap-1.5">
+                        <button type="button" className="glass-button active text-[10px]" onClick={saveNoteToDisk} disabled={!noteBody}>Save</button>
+                        <button type="button" className="glass-button text-[10px]" onClick={() => setTab("chat")}>Chat</button>
+                      </div>
+                    </div>
+                    {!noteBody && <p className="text-xs text-zinc-500 font-mono">Select a note to edit, or create one. Saves hit the Master vault folder Obsidian uses.</p>}
                     {noteBody && (
-                      <div className="flex-1 overflow-y-auto space-y-2">
+                      <div className="flex-1 flex flex-col min-h-0 gap-2">
                         <div className="text-sm font-display text-zinc-100">{noteBody.title}</div>
-                        <div className="text-[10px] font-mono text-zinc-500">{noteBody.rel_path || noteBody.path}</div>
-                        <pre className="text-[11px] font-mono text-zinc-400 whitespace-pre-wrap leading-relaxed">{(noteBody.content || "").slice(0, 12000)}</pre>
+                        <div className="text-[10px] font-mono text-zinc-500 truncate" title={noteBody.path}>{noteBody.rel_path || noteBody.path}</div>
+                        <textarea
+                          className="glass-input flex-1 min-h-[200px] font-mono text-[11px] leading-relaxed resize-none"
+                          value={editContent}
+                          onChange={e => { setEditContent(e.target.value); setSaveStatus("Unsaved changes"); }}
+                          spellCheck={false}
+                        />
+                        <div className="space-y-1.5 border-t border-royal/10 pt-2">
+                          <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Activate agent on this vault</div>
+                          <input className="glass-input text-[11px]" placeholder="e.g. Reorganize this note, add wikilinks to Second Brain, extract 3 tasks for today…"
+                            value={agentJob} onChange={e => setAgentJob(e.target.value)}
+                            onKeyDown={e => e.key === "Enter" && runVaultAgent()} />
+                          <div className="flex flex-wrap gap-1.5">
+                            <button type="button" className="glass-button active text-[10px]" disabled={agentBusy} onClick={() => runVaultAgent()}>
+                              {agentBusy ? "Agent working…" : "Run agent"}
+                            </button>
+                            <button type="button" className="glass-button text-[10px]" disabled={agentBusy}
+                              onClick={() => runVaultAgent("Improve structure, add wikilinks, and keep meaning. Write changes to this file on disk.")}>
+                              Polish note
+                            </button>
+                            <button type="button" className="glass-button text-[10px]" disabled={agentBusy}
+                              onClick={() => runVaultAgent("From this note, add clear tasks to Calendar/Daily for today using 📅 🔗 🎯 syntax. Write files on disk.")}>
+                              Extract tasks
+                            </button>
+                          </div>
+                          {saveStatus && <p className="text-[10px] font-mono text-gold">{saveStatus}</p>}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -771,10 +900,14 @@
                     </div>
                   </div>
                   <p className="text-[11px] text-zinc-500 leading-relaxed">
-                    Engines (Ledger, Local Presence, Ethnine, Monastery, Ashley) and Apple Sync UI have been removed.
-                    Core mission: continuous Grok + Master Obsidian archive + daily tasks/calendar.
+                    Core loop: dashboard edits write to Master vault on disk · continuous Grok (cwd = Master) uses tools to reorganize the same network · Obsidian reflects changes live.
                     Launch with <span className="font-mono text-royal">start star</span>.
                   </p>
+                  <div className="text-[10px] font-mono text-zinc-500 space-y-1">
+                    <div>PUT /memory/note — direct save</div>
+                    <div>POST /agent/vault-task — activate agent on vault</div>
+                    <div>POST /chat/stream — talk + tools</div>
+                  </div>
                   <button type="button" className="glass-button active" onClick={refresh}>Refresh status</button>
                 </div>
               )}
