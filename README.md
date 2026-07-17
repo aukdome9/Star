@@ -1,0 +1,2 @@
+# Star
+Autonomous, vibecoding, dashboard
