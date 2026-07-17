@@ -82,7 +82,7 @@ Deep Roots, the Symbiotic Network, and the Seed are not three separate strategie
 
 This completes the second book of the [[Tri-Union Series]]. [[Dimensional Walking]] showed you the life. Dimensional Reconstructing — Flame, Void, and now Earth — builds the mind that can no longer fail to hold it.
 
-Get the full doctrine on the Earth, plus all three companion workbooks — Deep Roots, Symbiotic Network, and Seed Mapping. All free. Link in bio.
+Where in your own system have you been trying to force growth a root would have handled quietly?
 
 > **🎨 Grok Visual Prompt — "Building From First Nature":** Wide closing composition: a single ancient tree at the center of a parchment-toned landscape at dawn, its canopy subtly echoing a flame shape at the very top (tying to [[The Flame]]), its trunk base surrounded by a perfectly still, reflective pool suggesting emptiness and depth (tying to [[The Void]]), and its visible root structure fanning out in engraved gold linework beneath the soil line, connecting faintly to smaller trees at the frame's edges (tying to the Symbiotic Network). No text, no figures. Style matches the closing images of [[the-dual-self-article]], [[the-creator-article]], and [[the-field-article]] for series continuity — this is the fourth and final image in that closing sequence, completing all nine principles' visual arc. Wide 16:9 composition.
 

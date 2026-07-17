@@ -1,11 +1,11 @@
 ---
-title: "XP — The Flame x The Creator: faith was never two faiths"
+title: "XP — The Flame x The Creator: one fire, one faith"
 platform: X
 content_type: single
 publish_date: 2026-08-29
 publish_time: "11:00"
 post_status: draft
-hook: "Faith with yourself and faith with the Creator were never two different faiths."
+hook: "You can't doubt yourself in one room and trust the Creator in the next — The Flame only burns in a house with a single faith."
 cta: "Full doctrine on The Flame — free in bio."
 hashtags: []
 media_files: []
